@@ -16,7 +16,7 @@ Use `v-once` for content that uses runtime data but never needs updating, and `v
 
 - Apply `v-once` to elements that use runtime data but never need updating
 - Apply `v-memo` only when profiling identifies costly list rendering
-- Make sure the dependency array changes whenever the subtree's output must change. Objects are compared by reference: `item` catches a replaced item, but a value rendered directly in the subtree (`{{ item.name }}`) needs its own entry to catch in-place mutation
+- Include dependencies whose values change whenever the memoized VNode output must change. Object entries are compared by identity: include `item` for replacements, and `item.name` when in-place edits must update text or props rendered by this subtree
 - Verify correct updates and use Vue DevTools to confirm a measurable gain before retaining the optimization
 
 ## v-once: Render Once, Never Update
