@@ -10,14 +10,14 @@ tags: [vue3, performance, v-once, v-memo, optimization, directives]
 
 **Impact: MEDIUM** - When a component re-renders, its render function re-creates VNodes for the dynamic parts of its template. For content that never changes or changes infrequently, `v-once` and `v-memo` let Vue reuse the previous VNodes, skipping VNode creation and diffing for that subtree.
 
-Use `v-once` for content that uses runtime data but never needs updating, and `v-memo` for large lists where profiling shows re-renders are costly. Any value the memoized part of the template reads must be covered by a dependency that changes with it; otherwise the subtree can render stale data.
+Use `v-once` for content that uses runtime data but never needs updating, and `v-memo` only when profiling identifies costly list rendering. Any value the memoized part of the template reads must be covered by a dependency that changes with it; otherwise the subtree can render stale data.
 
 ## Task List
 
 - Apply `v-once` to elements that use runtime data but never need updating
-- Apply `v-memo` to large lists (typically 1000+ items) only after profiling shows re-renders are costly; an incomplete dependency array renders stale data
+- Apply `v-memo` only when profiling identifies costly list rendering
 - Make sure the dependency array changes whenever the subtree's output must change. Objects are compared by reference: `item` catches a replaced item, but a value rendered directly in the subtree (`{{ item.name }}`) needs its own entry to catch in-place mutation
-- Profile with Vue DevTools to confirm a measurable gain
+- Verify correct updates and use Vue DevTools to confirm a measurable gain before retaining the optimization
 
 ## v-once: Render Once, Never Update
 
@@ -68,7 +68,7 @@ const companyName = 'Acme Corp'
 **BAD:**
 ```vue
 <template>
-  <!-- BAD (in a 1000+ row list where profiling shows slow updates): Every row's VNodes are re-created and diffed when selectedId changes (ExpensiveComponent itself is skipped because its props are unchanged) -->
+  <!-- BAD (when profiling shows costly list rendering): Every row's VNodes are re-created and diffed when selectedId changes (ExpensiveComponent itself is skipped because its props are unchanged) -->
   <div v-for="item in list" :key="item.id">
     <div :class="{ selected: item.id === selectedId }">
       <ExpensiveComponent :data="item" />
@@ -82,7 +82,7 @@ const companyName = 'Acme Corp'
 <script setup>
 import { ref } from 'vue'
 
-const list = ref([/* 1000+ items */])
+const list = ref([/* many items */])
 const selectedId = ref(null)
 
 // When selectedId changes, only the previously selected row and the newly
