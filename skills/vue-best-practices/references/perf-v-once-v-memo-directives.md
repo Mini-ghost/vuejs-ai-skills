@@ -91,8 +91,8 @@ const selectedId = ref(null)
 // also updates its row.
 // In-place mutations (item.name = ...) don't invalidate the memo, but
 // ExpensiveComponent still updates if it reads item.name itself.
-// `item` must keep a stable reference: if `list` is a computed that rebuilds
-// objects whenever it recomputes, every row re-creates its VNodes anyway.
+// Preserve references for unchanged items to improve cache reuse.
+// Recreating every item when a computed list recomputes invalidates every row's memo.
 // `[item.id === selectedId]` alone is enough only when items are never replaced,
 // such as data loaded once and never updated
 </script>
