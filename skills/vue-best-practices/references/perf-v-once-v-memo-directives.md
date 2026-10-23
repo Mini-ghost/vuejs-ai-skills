@@ -10,7 +10,7 @@ tags: [vue3, performance, v-once, v-memo, optimization, directives]
 
 **Impact: MEDIUM** - When a component re-renders, its render function re-creates VNodes for the dynamic parts of its template. For content that never changes or changes infrequently, `v-once` and `v-memo` let Vue reuse the previous VNodes, skipping VNode creation and diffing for that subtree.
 
-Use `v-once` for content that uses runtime data but never needs updating, and `v-memo` only when profiling identifies costly list rendering. Any value the memoized part of the template reads must be covered by a dependency that changes with it; otherwise the subtree can render stale data.
+Use `v-once` for content that uses runtime data but never needs updating, and `v-memo` only when profiling identifies costly list rendering. Incomplete memo dependencies can render stale data.
 
 ## Task List
 
@@ -65,10 +65,11 @@ const companyName = 'Acme Corp'
 
 ## v-memo: Conditional Memoization for Lists
 
+When list rendering is a measured bottleneck, memoization can skip row VNode creation and diffing. Without it, selection changes re-create every row's VNodes even though `ExpensiveComponent` skips parent-triggered updates with unchanged props.
+
 **BAD:**
 ```vue
 <template>
-  <!-- BAD (when profiling shows costly list rendering): Every row's VNodes are re-created and diffed when selectedId changes (ExpensiveComponent itself is skipped because its props are unchanged) -->
   <div v-for="item in list" :key="item.id">
     <div :class="{ selected: item.id === selectedId }">
       <ExpensiveComponent :data="item" />
@@ -77,6 +78,12 @@ const companyName = 'Acme Corp'
 </template>
 ```
 
+With the dependencies below, selection changes re-create VNodes only for rows whose selection state changes; other rows reuse cached VNodes.
+
+Preserve references for unchanged items to improve cache reuse. Recreating every item when a computed list recomputes invalidates every row's memo.
+
+In-place mutations do not invalidate the `item` dependency, but `ExpensiveComponent` still updates if its render reads the mutated reactive field. For this example, selection-only dependencies are sufficient when items are never replaced.
+
 **GOOD:**
 ```vue
 <script setup>
@@ -84,21 +91,10 @@ import { ref } from 'vue'
 
 const list = ref([/* many items */])
 const selectedId = ref(null)
-
-// When selectedId changes, only the previously selected row and the newly
-// selected row re-create their VNodes; all other rows reuse their cached VNodes.
-// `item` is in the array so a replaced item (list.value[i] = { ...item, name })
-// also updates its row.
-// In-place mutations (item.name = ...) don't invalidate the memo, but
-// ExpensiveComponent still updates if it reads item.name itself.
-// Preserve references for unchanged items to improve cache reuse.
-// Recreating every item when a computed list recomputes invalidates every row's memo.
-// `[item.id === selectedId]` alone is enough only when items are never replaced,
-// such as data loaded once and never updated
 </script>
 
 <template>
-  <!-- GOOD: Rows only update when their item or selection state changes -->
+  <!-- Include item so replacements refresh the child prop even when selection is unchanged. -->
   <div
     v-for="item in list"
     :key="item.id"
