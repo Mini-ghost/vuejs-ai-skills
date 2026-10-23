@@ -167,8 +167,8 @@ const items = ref([/* ... */])
 | Scenario | Without Directive | With v-once/v-memo |
 |----------|-------------------|-------------------|
 | Runtime-bound content that never changes, component re-renders 100x | VNodes re-created 100x | VNodes created once |
-| 1000 items, selection changes | 1000 rows' VNodes re-created and diffed | 2 rows re-created, 998 reused |
-| Child component, props and slots unchanged | Not re-rendered | Not re-rendered |
+| 1000 items, selection changes | 1000 rows' VNodes re-created and diffed | At most 2 rows re-created; remaining rows reused, assuming unchanged items |
+| Parent re-render with stable child props and slots | Not re-rendered | Not re-rendered |
 
 ## Debugging Memoized Components
 
