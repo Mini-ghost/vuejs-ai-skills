@@ -1,22 +1,21 @@
 ---
 title: Component Fallthrough Attributes Best Practices
 impact: MEDIUM
-impactDescription: Incorrect $attrs access and reactivity assumptions can cause undefined values and watchers that never run
+impactDescription: Wrong attr keys return undefined, and state derived from attrs can go stale
 type: best-practice
 tags: [vue3, attrs, fallthrough-attributes, composition-api, reactivity]
 ---
 
 # Component Fallthrough Attributes Best Practices
 
-**Impact: MEDIUM** - Fallthrough attributes are straightforward once you follow Vue's conventions: hyphenated names use bracket notation, listener keys are camelCase `onX`, and `useAttrs()` is current-but-not-reactive.
+**Impact: MEDIUM** - `attrs` keeps hyphenated attribute names as-is and stores listeners under camelCase `onX` keys, and Vue doesn't support observing it from script. Wrong keys return `undefined`, and state derived from `attrs` can miss changes.
 
 ## Task List
 
 - Access hyphenated attribute names with bracket notation (for example `attrs['data-testid']`)
 - Access event listeners with camelCase `onX` keys (for example `attrs.onClick`)
-- Do not `watch()` values returned from `useAttrs()`; those watchers do not trigger on attr changes
-- Use `onUpdated()` for attr-driven side effects
-- Promote frequently observed attrs to props when reactive observation is required
+- Watch or derive state from props, not `attrs`
+- Use `onUpdated()` for side effects that need the latest attrs
 
 ## Access Attribute and Listener Keys Correctly
 
@@ -29,7 +28,7 @@ import { useAttrs } from 'vue'
 
 const attrs = useAttrs()
 
-console.log(attrs.data-testid)  // Syntax error
+console.log(attrs.data-testid)  // Parsed as attrs.data - testid
 console.log(attrs.dataTestid)   // undefined for data-testid
 console.log(attrs['on-click'])  // undefined
 console.log(attrs['@click'])    // undefined
@@ -65,40 +64,25 @@ console.log(attrs.onMouseEnter)
 | `@custom-event="fn"` | `attrs.onCustomEvent` |
 | `@update:modelValue="fn"` | `attrs['onUpdate:modelValue']` |
 
-## `useAttrs()` Is Not Reactive
+## Use Props, Not `attrs`, for Values the Component Reacts To
 
-`useAttrs()` always reflects the latest values, but it is intentionally not reactive for watcher tracking.
+Vue's docs don't support observing `attrs` with watchers and recommend props instead. Code that watches or derives state from `attrs` relies on unsupported behavior and can miss changes, such as an attr added after mount.
 
 **BAD:**
 ```vue
 <script setup>
-import { watch, watchEffect, useAttrs } from 'vue'
+import { computed, watch, useAttrs } from 'vue'
 
 const attrs = useAttrs()
 
 watch(
   () => attrs.someAttr,
   (newValue) => {
-    console.log('Changed:', newValue) // Never runs on attr changes
+    console.log('Changed:', newValue)
   }
 )
 
-watchEffect(() => {
-  console.log(attrs.class) // Runs on setup, not on attr updates
-})
-</script>
-```
-
-**GOOD:**
-```vue
-<script setup>
-import { onUpdated, useAttrs } from 'vue'
-
-const attrs = useAttrs()
-
-onUpdated(() => {
-  console.log('Latest attrs:', attrs)
-})
+const hasTestId = computed(() => 'data-testid' in attrs) // Misses attrs added later
 </script>
 ```
 
@@ -120,20 +104,22 @@ watch(
 </script>
 ```
 
-## Common Patterns
+For side effects that need the latest attrs, use `onUpdated()`. It runs after every re-render of the component, not on initial mount.
 
-### Check for optional attrs safely
-
+**GOOD:**
 ```vue
 <script setup>
-import { computed, useAttrs } from 'vue'
+import { onUpdated, useAttrs } from 'vue'
 
 const attrs = useAttrs()
 
-const hasTestId = computed(() => 'data-testid' in attrs)
-const ariaLabel = computed(() => attrs['aria-label'] ?? 'Default label')
+onUpdated(() => {
+  console.log('Latest attrs:', attrs)
+})
 </script>
 ```
+
+## Common Patterns
 
 ### Forward listeners after internal logic
 
