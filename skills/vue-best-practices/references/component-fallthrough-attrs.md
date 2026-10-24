@@ -1,7 +1,7 @@
 ---
 title: Component Fallthrough Attributes Best Practices
 impact: MEDIUM
-impactDescription: Wrong attr keys return undefined, and state derived from attrs can go stale
+impactDescription: Wrong attr keys return undefined, state derived from attrs can go stale, and calling listeners from attrs can run parent handlers twice
 type: best-practice
 tags: [vue3, attrs, fallthrough-attributes, composition-api, reactivity]
 ---
@@ -16,6 +16,7 @@ tags: [vue3, attrs, fallthrough-attributes, composition-api, reactivity]
 - Access event listeners with camelCase `onX` keys (for example `attrs.onClick`)
 - Watch or derive state from props, not `attrs`
 - Use `onUpdated()` for side effects that need the latest attrs
+- For component events, use `defineEmits()` and `emit()` instead of calling listeners from `attrs`
 
 ## Access Attribute and Listener Keys Correctly
 
@@ -63,6 +64,8 @@ console.log(attrs.onMouseEnter)
 | `@click="fn"` | `attrs.onClick` |
 | `@custom-event="fn"` | `attrs.onCustomEvent` |
 | `@update:modelValue="fn"` | `attrs['onUpdate:modelValue']` |
+
+Listeners for events declared in `defineEmits()` are not in `attrs`.
 
 ## Use Props, Not `attrs`, for Values the Component Reacts To
 
@@ -119,21 +122,38 @@ onUpdated(() => {
 </script>
 ```
 
-## Common Patterns
+## Emit Events Instead of Calling Listeners From `attrs`
 
-### Forward listeners after internal logic
+A listener for an undeclared event stays in `attrs` and also falls through to the root element. Calling it manually from a root handler runs the parent's handler twice. `inheritAttrs: false` avoids the second call but stops `class` and other attrs from falling through, and binding them back with `v-bind="attrs"` re-attaches the listener. Declaring the event with `defineEmits()` removes the listener from `attrs` and from fallthrough.
 
+**BAD:**
 ```vue
 <script setup>
 import { useAttrs } from 'vue'
-
-defineOptions({ inheritAttrs: false })
 
 const attrs = useAttrs()
 
 function handleClick(event) {
   console.log('Internal handling first')
   attrs.onClick?.(event)
+}
+</script>
+
+<template>
+  <button @click="handleClick">
+    <slot />
+  </button>
+</template>
+```
+
+**GOOD:**
+```vue
+<script setup>
+const emit = defineEmits(['click'])
+
+function handleClick(event) {
+  console.log('Internal handling first')
+  emit('click', event)
 }
 </script>
 
@@ -155,6 +175,6 @@ import { useAttrs } from 'vue'
 const attrs = useAttrs()
 
 const testId = attrs['data-testid'] as string | undefined
-const onClick = attrs.onClick as ((event: MouseEvent) => void) | undefined
+const ariaLabel = attrs['aria-label'] as string | undefined
 </script>
 ```
